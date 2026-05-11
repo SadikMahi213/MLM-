@@ -1,0 +1,588 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  COMMISSION
+  BONUS
+  INCOME
+  REFERRAL
+  BINARY
+  GENERATION
+  TASK_REWARD
+  ADJUSTMENT
+  FEE
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum CommissionType {
+  REFERRAL
+  BINARY
+  GENERATION
+  DAILY_INCOME
+  TASK
+  BONUS
+}
+
+enum CommissionStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CRYPTO
+  E_WALLET
+  CASH
+}
+
+enum TaskType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  SPECIAL
+}
+
+// ─── Users ───────────────────────────────────────────────
+model User {
+  id                  Int       @id @default(autoincrement())
+  name                String
+  email               String    @unique
+  phone               String?   @unique
+  username            String?   @unique
+  password            String
+  sponsorId           Int?
+  packageId           Int?
+  emailVerifiedAt     DateTime?
+  phoneVerifiedAt     DateTime?
+  isActive            Boolean   @default(true)
+  isVerified          Boolean   @default(false)
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorSecret     String?
+  avatar              String?
+  profilePhoto        String?
+  country             String?
+  city                String?
+  address             String?
+  dateOfBirth         DateTime?
+  gender              String?
+  telecomCode         String?
+  team                String?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  rememberToken       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  sponsor             User?        @relation("Sponsor", fields: [sponsorId], references: [id])
+  referrals           User[]       @relation("Sponsor")
+  package             Package?     @relation(fields: [packageId], references: [id])
+  wallet              Wallet?
+  binaryPosition      BinaryPosition?
+  commissions         Commission[]
+  commissionsFrom     Commission[]         @relation("CommissionFromUser")
+  withdrawals         Withdrawal[]
+  approvedWithdrawals Withdrawal[]        @relation("ApprovedBy")
+  walletTransactions  WalletTransaction[]
+  deviceSessions      DeviceSession[]
+  orders              Order[]
+  taskCompletions     TaskCompletion[]
+  binaryChildren      BinaryPosition[]     @relation("BinaryParent")
+  userRanks           UserRank[]
+  auditLogs           AuditLog[]
+
+  @@map("users")
+}
+
+// ─── Password Reset Tokens ──────────────────────────────
+model PasswordResetToken {
+  email      String
+  token      String
+  createdAt  DateTime?
+
+  @@id([email])
+  @@map("password_reset_tokens")
+}
+
+// ─── Sessions ───────────────────────────────────────────
+model Session {
+  id           String   @id
+  userId       Int?
+  ipAddress    String?
+  userAgent    String?
+  payload      String
+  lastActivity Int
+
+  @@map("sessions")
+}
+
+// ─── Packages ──────────────────────────────────────────
+model Package {
+  id                     Int      @id @default(autoincrement())
+  name                   String
+  price                  Decimal  @default(0)
+  dailyIncome            Decimal  @default(0)
+  binaryBonusPercent     Decimal  @default(0)
+  referralBonusPercent   Decimal  @default(0)
+  generationBonusPercent Decimal  @default(0)
+  durationDays           Int      @default(365)
+  sortOrder              Int      @default(0)
+  type                   String?
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  users User[]
+
+  @@map("packages")
+}
+
+// ─── Wallets ───────────────────────────────────────────
+model Wallet {
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @unique
+  balance             Decimal  @default(0)
+  incomeBalance       Decimal  @default(0)
+  bonusBalance        Decimal  @default(0)
+  withdrawableBalance Decimal  @default(0)
+  totalDeposited      Decimal  @default(0)
+  totalWithdrawn      Decimal  @default(0)
+  totalIncome         Decimal  @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id])
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+// ─── Wallet Transactions ─────────────────────────────
+model WalletTransaction {
+  id            Int               @id @default(autoincrement())
+  userId        Int
+  walletId      Int
+  type          TransactionType
+  amount        Decimal           @default(0)
+  fee           Decimal           @default(0)
+  balanceBefore Decimal           @default(0)
+  balanceAfter  Decimal           @default(0)
+  status        TransactionStatus @default(COMPLETED)
+  referenceType String?
+  referenceId   Int?
+  description   String?
+  metadata      Json?
+  transactionId String?           @unique
+  completedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@map("wallet_transactions")
+}
+
+// ─── Binary Positions ────────────────────────────────
+model BinaryPosition {
+  id                 Int      @id @default(autoincrement())
+  userId             Int      @unique
+  parentId           Int?
+  position           String?
+  path               String?
+  level              Int?
+  leftBv             Decimal  @default(0)
+  rightBv            Decimal  @default(0)
+  carryForwardLeft   Decimal  @default(0)
+  carryForwardRight  Decimal  @default(0)
+  totalLeftMembers   Int      @default(0)
+  totalRightMembers  Int      @default(0)
+  activeLeftMembers  Int      @default(0)
+  activeRightMembers Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user   User  @relation(fields: [userId], references: [id])
+  parent User? @relation("BinaryParent", fields: [parentId], references: [id])
+
+  @@map("binary_positions")
+}
+
+// ─── Commissions ────────────────────────────────────
+model Commission {
+  id          Int             @id @default(autoincrement())
+  userId      Int
+  fromUserId  Int?
+  type        CommissionType
+  amount      Decimal         @default(0)
+  percentage  Decimal         @default(0)
+  status      CommissionStatus @default(PENDING)
+  description String?
+  metadata    Json?
+  creditedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user     User  @relation(fields: [userId], references: [id], map: "commissions_user_id_foreign")
+  fromUser User? @relation("CommissionFromUser", fields: [fromUserId], references: [id], map: "commissions_from_user_id_foreign")
+
+  @@map("commissions")
+}
+
+// ─── Withdrawals ───────────────────────────────────
+model Withdrawal {
+  id             Int               @id @default(autoincrement())
+  userId         Int
+  amount         Decimal           @default(0)
+  fee            Decimal           @default(0)
+  netAmount      Decimal           @default(0)
+  paymentMethod  PaymentMethod?
+  accountNumber  String?
+  accountHolder  String?
+  status         WithdrawalStatus  @default(PENDING)
+  adminNote      String?
+  approvedById   Int?
+  approvedAt     DateTime?
+  completedAt    DateTime?
+  metadata       Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  user      User  @relation(fields: [userId], references: [id], map: "withdrawals_user_id_foreign")
+  approvedBy User? @relation("ApprovedBy", fields: [approvedById], references: [id], map: "withdrawals_approved_by_foreign")
+
+  @@map("withdrawals")
+}
+
+// ─── Daily Tasks ───────────────────────────────────
+model DailyTask {
+  id           Int              @id @default(autoincrement())
+  title        String
+  description  String?
+  reward       Decimal          @default(0)
+  type         TaskType         @default(DAILY)
+  requirements Json?
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  completions TaskCompletion[]
+
+  @@map("daily_tasks")
+}
+
+// ─── Task Completions ────────────────────────────
+model TaskCompletion {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  dailyTaskId    Int
+  completedDate  DateTime
+  rewardClaimed  Boolean  @default(false)
+  claimedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id])
+  dailyTask DailyTask @relation(fields: [dailyTaskId], references: [id])
+
+  @@unique([userId, dailyTaskId, completedDate])
+  @@map("task_completions")
+}
+
+// ─── Notifications ───────────────────────────────
+model Notification {
+  id        String    @id @default(uuid())
+  type      NotificationType @default(INFO)
+  notifiableType String
+  notifiableId   Int
+  data      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("notifications")
+}
+
+// ─── Device Sessions ────────────────────────────
+model DeviceSession {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  deviceName   String?
+  deviceType   String?
+  platform     String?
+  browser      String?
+  ipAddress    String?
+  userAgent    String?
+  location     String?
+  isCurrent    Boolean  @default(false)
+  lastActivity DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("device_sessions")
+}
+
+// ─── Audit Logs ────────────────────────────────
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?
+  action      String
+  module      String?
+  auditableType String?
+  auditableId   Int?
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ─── Settings ──────────────────────────────────
+model Setting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  value       String?
+  group       String?
+  type        String?
+  isPublic    Boolean  @default(false)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// ─── Ranks ─────────────────────────────────────
+model Rank {
+  id               Int      @id @default(autoincrement())
+  name             String
+  level            Int      @unique
+  minDirectReferrals Int    @default(0)
+  minTeamMembers   Int      @default(0)
+  minActiveTeam    Int      @default(0)
+  minTeamBv        Decimal  @default(0)
+  bonusPercent     Decimal  @default(0)
+  icon             String?
+  description      String?
+  benefits         Json?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  userRanks UserRank[]
+
+  @@map("ranks")
+}
+
+// ─── User Ranks (pivot) ───────────────────────
+model UserRank {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  rankId     Int
+  isCurrent  Boolean  @default(false)
+  achievedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  rank Rank @relation(fields: [rankId], references: [id])
+
+  @@unique([userId, rankId])
+  @@map("user_ranks")
+}
+
+// ─── Products ────────────────────────────────
+model Product {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  price        Decimal  @default(0)
+  comparePrice Decimal  @default(0)
+  category     String?
+  images       Json?
+  stock        Int      @default(0)
+  sku          String   @unique
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@map("products")
+}
+
+// ─── Orders ──────────────────────────────────
+model Order {
+  id              Int          @id @default(autoincrement())
+  userId          Int
+  orderNumber     String       @unique
+  subtotal        Decimal      @default(0)
+  shippingCost    Decimal      @default(0)
+  tax             Decimal      @default(0)
+  total           Decimal      @default(0)
+  status          OrderStatus  @default(PENDING)
+  paymentMethod   PaymentMethod?
+  paymentStatus   PaymentStatus @default(PENDING)
+  shippingAddress String?
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+
+  @@map("orders")
+}
+
+// ─── Order Items ────────────────────────────
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  productId Int
+  quantity  Int
+  price     Decimal  @default(0)
+  total     Decimal  @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// ─── Permissions & Roles (Spatie-compatible) ──
+model Permission {
+  id        Int      @id @default(autoincrement())
+  name      String
+  guardName String   @default("web")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roles RoleHasPermission[]
+  users ModelHasPermission[]
+
+  @@unique([name, guardName])
+  @@map("permissions")
+}
+
+model Role {
+  id        Int      @id @default(autoincrement())
+  name      String
+  guardName String   @default("web")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  permissions RoleHasPermission[]
+  users       ModelHasRole[]
+
+  @@unique([name, guardName])
+  @@map("roles")
+}
+
+model ModelHasPermission {
+  permissionId   Int
+  modelType      String
+  modelId        Int
+
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([permissionId, modelType, modelId])
+  @@map("model_has_permissions")
+}
+
+model ModelHasRole {
+  roleId    Int
+  modelType String
+  modelId   Int
+
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@id([roleId, modelType, modelId])
+  @@map("model_has_roles")
+}
+
+model RoleHasPermission {
+  permissionId Int
+  roleId       Int
+
+  permission Permission @relation(fields: [permissionId], references: [id])
+  role       Role       @relation(fields: [roleId], references: [id])
+
+  @@id([permissionId, roleId])
+  @@map("role_has_permissions")
+}
+
+// ─── Commission Rules ────────────────────────
+model CommissionRule {
+  id          Int      @id @default(autoincrement())
+  name        String
+  type        String
+  level       Int      @default(1)
+  percentage  Decimal  @default(0)
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([type, level])
+  @@map("commission_rules")
+}

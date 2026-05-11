@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 interface ApiOptions {
   method?: string
@@ -33,7 +33,6 @@ class ApiClient {
   private async request<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
     const headers: Record<string, string> = {
       Accept: "application/json",
-      "ngrok-skip-browser-warning": "true",
       ...options.headers,
     }
 
@@ -53,7 +52,7 @@ class ApiClient {
       headers,
       body: isFormData ? options.body : (options.body ? JSON.stringify(options.body) : undefined),
       cache: options.cache || "no-store",
-      credentials: "include",
+      credentials: "same-origin",
       signal,
     })
 
