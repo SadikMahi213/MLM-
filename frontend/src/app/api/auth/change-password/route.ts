@@ -8,26 +8,16 @@ export async function POST(request: NextRequest) {
   if (!user) return unauthorizedResponse()
 
   try {
-    const { currentPassword, newPassword } = await request.json()
+    const { current_password, new_password } = await request.json()
 
-    if (!currentPassword || !newPassword) {
-      return errorResponse("Current password and new password are required")
-    }
+    if (!current_password || !new_password) return errorResponse("Current password and new password are required")
+    if (new_password.length < 6) return errorResponse("New password must be at least 6 characters")
 
-    if (newPassword.length < 6) {
-      return errorResponse("New password must be at least 6 characters")
-    }
+    const valid = await comparePassword(current_password, user.password)
+    if (!valid) return errorResponse("Current password is incorrect", 422)
 
-    const valid = await comparePassword(currentPassword, user.password)
-    if (!valid) {
-      return errorResponse("Current password is incorrect", 422)
-    }
-
-    const hashed = await hashPassword(newPassword)
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { password: hashed },
-    })
+    const hashed = await hashPassword(new_password)
+    await prisma.user.update({ where: { id: user.id }, data: { password: hashed } })
 
     return successResponse({ message: "Password changed successfully" })
   } catch (error) {

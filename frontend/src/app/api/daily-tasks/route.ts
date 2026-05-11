@@ -10,27 +10,19 @@ export async function GET(request: NextRequest) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const tasks = await prisma.dailyTask.findMany({
-    where: { isActive: true },
-    orderBy: { createdAt: "asc" },
-  })
+  const tasks = await prisma.dailyTask.findMany({ where: { isActive: true }, orderBy: { createdAt: "asc" } })
 
   const completions = await prisma.taskCompletion.findMany({
-    where: {
-      userId: user.id,
-      completedDate: { gte: today },
-    },
+    where: { userId: user.id, completedDate: { gte: today } },
   })
 
-  const tasksWithStatus = tasks.map((task) => {
-    const completed = completions.find((c) => c.dailyTaskId === task.id)
-    return {
-      ...task,
-      isCompleted: !!completed,
-      rewardClaimed: completed?.rewardClaimed || false,
-      completionId: completed?.id || null,
-    }
+  return successResponse({
+    data: tasks.map((t) => ({
+      id: t.id, title: t.title, description: t.description, reward: Number(t.reward),
+      type: t.type.toLowerCase(), requirements: t.requirements, is_active: t.isActive,
+      completed_today: completions.some((c) => c.dailyTaskId === t.id && !c.rewardClaimed),
+      reward_claimed: completions.some((c) => c.dailyTaskId === t.id && c.rewardClaimed),
+      created_at: t.createdAt.toISOString(), updated_at: t.updatedAt.toISOString(),
+    })),
   })
-
-  return successResponse({ data: tasksWithStatus })
 }

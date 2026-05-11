@@ -21,12 +21,12 @@ export async function GET(request: NextRequest) {
   ])
 
   return successResponse({
-    data: transactions,
-    meta: {
-      total,
-      page,
-      perPage,
-      lastPage: Math.ceil(total / perPage),
-    },
+    data: transactions.map((t) => ({
+      id: t.id, type: t.type.toLowerCase(), amount: Number(t.amount), fee: Number(t.fee),
+      balance_before: Number(t.balanceBefore), balance_after: Number(t.balanceAfter),
+      status: t.status.toLowerCase(), description: t.description, transaction_id: t.transactionId,
+      created_at: t.createdAt.toISOString(), completed_at: t.completedAt?.toISOString() || null,
+    })),
+    meta: { total, page, perPage, lastPage: Math.ceil(total / perPage) },
   })
 }

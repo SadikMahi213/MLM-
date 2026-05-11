@@ -1,50 +1,52 @@
-import { type ClassValue, clsx } from "clsx"
+import { clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
-export function cn(...inputs: ClassValue[]) {
+export function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency = "USD"): string {
+export function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency,
+    currency: "SAR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount)
+  }).format(value)
 }
 
-export function formatDate(date: string | Date, format: "short" | "long" | "relative" = "short"): string {
+export function formatDate(date: string, format: "short" | "relative" = "short"): string {
+  if (!date) return ""
   const d = new Date(date)
+  if (isNaN(d.getTime())) return ""
+
   if (format === "relative") {
     const now = new Date()
-    const diff = now.getTime() - d.getTime()
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(diff / 3600000)
-    const days = Math.floor(diff / 86400000)
-    if (minutes < 1) return "Just now"
-    if (minutes < 60) return `${minutes}m ago`
-    if (hours < 24) return `${hours}h ago`
-    if (days < 7) return `${days}d ago`
-    return d.toLocaleDateString()
+    const diffMs = now.getTime() - d.getTime()
+    const diffSec = Math.floor(diffMs / 1000)
+    const diffMin = Math.floor(diffSec / 60)
+    const diffHour = Math.floor(diffMin / 60)
+    const diffDay = Math.floor(diffHour / 24)
+
+    if (diffSec < 60) return "just now"
+    if (diffMin < 60) return `${diffMin}m ago`
+    if (diffHour < 24) return `${diffHour}h ago`
+    if (diffDay < 7) return `${diffDay}d ago`
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
   }
+
   return d.toLocaleDateString("en-US", {
     year: "numeric",
-    month: format === "long" ? "long" : "short",
+    month: "short",
     day: "numeric",
   })
 }
 
-export function truncate(str: string, length: number): string {
-  if (str.length <= length) return str
-  return str.slice(0, length) + "..."
-}
-
-export function generateReferralLink(username: string): string {
-  return `${process.env.NEXT_PUBLIC_APP_URL || "https://mlm-platform.com"}/register?ref=${username}`
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value)
 }
 
 export function getInitials(name: string): string {
+  if (!name) return "U"
   return name
     .split(" ")
     .map((n) => n[0])
@@ -53,8 +55,20 @@ export function getInitials(name: string): string {
     .slice(0, 2)
 }
 
-export function formatNumber(num: number): string {
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + "M"
-  if (num >= 1000) return (num / 1000).toFixed(1) + "K"
-  return num.toString()
+export function generateReferralLink(username: string): string {
+  if (typeof window === "undefined") return ""
+  return `${window.location.origin}/register?ref=${encodeURIComponent(username)}`
+}
+
+export function toSnakeCase(obj: any): any {
+  if (obj === null || obj === undefined) return obj
+  if (Array.isArray(obj)) return obj.map(toSnakeCase)
+  if (typeof obj !== "object" || obj instanceof Date) return obj
+
+  const result: Record<string, any> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    const snakeKey = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
+    result[snakeKey] = toSnakeCase(value)
+  }
+  return result
 }

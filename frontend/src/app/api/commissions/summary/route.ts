@@ -19,14 +19,8 @@ export async function GET(request: NextRequest) {
     _sum: { amount: true },
   })
 
-  const pendingEarnings = await prisma.commission.aggregate({
-    where: { userId: user.id, status: "PENDING" },
-    _sum: { amount: true },
-  })
-
   return successResponse({
-    byType: summary,
-    totalEarnings: totalEarnings._sum.amount || 0,
-    pendingEarnings: pendingEarnings._sum.amount || 0,
+    total: Number(totalEarnings._sum.amount || 0),
+    by_type: summary.map((s) => ({ type: s.type.toLowerCase(), total: Number(s._sum.amount || 0), count: s._count.id })),
   })
 }

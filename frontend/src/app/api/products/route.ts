@@ -13,5 +13,10 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
   })
 
-  return successResponse({ data: products })
+  return successResponse({
+    data: products.map((p) => ({
+      id: p.id, name: p.name, description: p.description, price: Number(p.price),
+      compare_price: Number(p.comparePrice), category: p.category, stock: p.stock, is_active: p.isActive,
+    })),
+  })
 }

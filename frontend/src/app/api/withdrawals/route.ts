@@ -11,17 +11,17 @@ export async function GET(request: NextRequest) {
   const page = parseInt(request.nextUrl.searchParams.get("page") || "1")
 
   const [withdrawals, total] = await Promise.all([
-    prisma.withdrawal.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: perPage,
-      skip: (page - 1) * perPage,
-    }),
+    prisma.withdrawal.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: perPage, skip: (page - 1) * perPage }),
     prisma.withdrawal.count({ where: { userId: user.id } }),
   ])
 
   return successResponse({
-    data: withdrawals,
+    data: withdrawals.map((w) => ({
+      id: w.id, amount: Number(w.amount), fee: Number(w.fee), net_amount: Number(w.netAmount),
+      payment_method: w.paymentMethod?.toLowerCase() || "bank", account_number: w.accountNumber,
+      account_holder: w.accountHolder, status: w.status.toLowerCase(), admin_note: w.adminNote,
+      created_at: w.createdAt.toISOString(), completed_at: w.completedAt?.toISOString() || null,
+    })),
     meta: { total, page, perPage, lastPage: Math.ceil(total / perPage) },
   })
 }
@@ -31,57 +31,22 @@ export async function POST(request: NextRequest) {
   if (!user) return unauthorizedResponse()
 
   try {
-    const { amount, paymentMethod, accountNumber, accountHolder } = await request.json()
-
-    if (!amount || amount <= 0) {
-      return errorResponse("Invalid withdrawal amount")
-    }
+    const { amount, payment_method, account_number, account_holder } = await request.json()
+    if (!amount || amount <= 0) return errorResponse("Invalid withdrawal amount")
 
     const wallet = await prisma.wallet.findUnique({ where: { userId: user.id } })
-    if (!wallet || wallet.withdrawableBalance < amount) {
-      return errorResponse("Insufficient withdrawable balance")
-    }
+    if (!wallet || Number(wallet.withdrawableBalance) < amount) return errorResponse("Insufficient withdrawable balance")
 
     const fee = amount * 0.02
     const netAmount = amount - fee
 
     const withdrawal = await prisma.withdrawal.create({
-      data: {
-        userId: user.id,
-        amount,
-        fee,
-        netAmount,
-        paymentMethod: paymentMethod || "BANK_TRANSFER",
-        accountNumber: accountNumber || null,
-        accountHolder: accountHolder || null,
-        status: "PENDING",
-      },
+      data: { userId: user.id, amount, fee, netAmount, paymentMethod: (payment_method || "BANK_TRANSFER").toUpperCase(), accountNumber: account_number || null, accountHolder: account_holder || null, status: "PENDING" },
     })
 
-    await prisma.wallet.update({
-      where: { userId: user.id },
-      data: {
-        withdrawableBalance: { decrement: amount },
-        totalWithdrawn: { increment: amount },
-      },
-    })
+    await prisma.wallet.update({ where: { userId: user.id }, data: { withdrawableBalance: { decrement: amount }, totalWithdrawn: { increment: amount } } })
 
-    await prisma.walletTransaction.create({
-      data: {
-        userId: user.id,
-        walletId: wallet.id,
-        type: "WITHDRAWAL",
-        amount,
-        fee,
-        balanceBefore: wallet.withdrawableBalance,
-        balanceAfter: Number(wallet.withdrawableBalance) - Number(amount),
-        status: "PENDING",
-        description: `Withdrawal via ${paymentMethod}`,
-        transactionId: "WTH-" + Date.now(),
-      },
-    })
-
-    return successResponse(withdrawal, 201)
+    return successResponse({ id: withdrawal.id, amount: Number(amount), fee: Number(fee), net_amount: Number(netAmount), status: "pending", created_at: withdrawal.createdAt.toISOString() }, 201)
   } catch (error) {
     console.error("Withdrawal error:", error)
     return errorResponse("Withdrawal failed", 500)

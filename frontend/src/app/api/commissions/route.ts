@@ -16,15 +16,18 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: perPage,
       skip: (page - 1) * perPage,
-      include: {
-        fromUser: { select: { id: true, name: true, email: true, username: true } },
-      },
+      include: { fromUser: { select: { id: true, name: true, email: true, username: true } } },
     }),
     prisma.commission.count({ where: { userId: user.id } }),
   ])
 
   return successResponse({
-    data: commissions,
+    data: commissions.map((c) => ({
+      id: c.id, type: c.type.toLowerCase(), amount: Number(c.amount), percentage: Number(c.percentage),
+      status: c.status.toLowerCase(), description: c.description,
+      from_user_id: c.fromUserId, metadata: c.metadata,
+      credited_at: c.creditedAt?.toISOString() || null, created_at: c.createdAt.toISOString(),
+    })),
     meta: { total, page, perPage, lastPage: Math.ceil(total / perPage) },
   })
 }

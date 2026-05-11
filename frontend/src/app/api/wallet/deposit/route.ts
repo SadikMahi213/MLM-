@@ -8,33 +8,26 @@ export async function POST(request: NextRequest) {
   if (!user) return unauthorizedResponse()
 
   try {
-    const { amount, paymentMethod } = await request.json()
-
-    if (!amount || amount <= 0) {
-      return errorResponse("Invalid deposit amount")
-    }
+    const { amount, payment_method } = await request.json()
+    if (!amount || amount <= 0) return errorResponse("Invalid deposit amount")
 
     const wallet = await prisma.wallet.findUnique({ where: { userId: user.id } })
     if (!wallet) return errorResponse("Wallet not found")
 
-    const transactionId = "DEP-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8)
-
     const transaction = await prisma.walletTransaction.create({
       data: {
-        userId: user.id,
-        walletId: wallet.id,
-        type: "DEPOSIT",
-        amount,
-        fee: 0,
-        balanceBefore: wallet.balance,
-        balanceAfter: wallet.balance,
-        status: "PENDING",
-        description: `Deposit via ${paymentMethod || "bank_transfer"}`,
-        transactionId,
+        userId: user.id, walletId: wallet.id, type: "DEPOSIT", amount, fee: 0,
+        balanceBefore: wallet.balance, balanceAfter: wallet.balance,
+        status: "PENDING", description: `Deposit via ${payment_method || "bank_transfer"}`,
+        transactionId: "DEP-" + Date.now() + Math.random().toString(36).slice(2, 8),
       },
     })
 
-    return successResponse(transaction, 201)
+    return successResponse({
+      id: transaction.id, type: transaction.type.toLowerCase(), amount: Number(transaction.amount),
+      status: transaction.status.toLowerCase(), description: transaction.description,
+      created_at: transaction.createdAt.toISOString(),
+    }, 201)
   } catch (error) {
     console.error("Deposit error:", error)
     return errorResponse("Deposit failed", 500)

@@ -11,16 +11,9 @@ export async function GET(request: NextRequest) {
   if (!wallet) return successResponse(null)
 
   return successResponse({
-    id: wallet.id,
-    userId: wallet.userId,
-    balance: wallet.balance,
-    incomeBalance: wallet.incomeBalance,
-    bonusBalance: wallet.bonusBalance,
-    withdrawableBalance: wallet.withdrawableBalance,
-    totalDeposited: wallet.totalDeposited,
-    totalWithdrawn: wallet.totalWithdrawn,
-    totalIncome: wallet.totalIncome,
-    createdAt: wallet.createdAt,
-    updatedAt: wallet.updatedAt,
+    id: wallet.id, balance: Number(wallet.balance), income_balance: Number(wallet.incomeBalance),
+    bonus_balance: Number(wallet.bonusBalance), withdrawable_balance: Number(wallet.withdrawableBalance),
+    total_deposited: Number(wallet.totalDeposited), total_withdrawn: Number(wallet.totalWithdrawn),
+    total_income: Number(wallet.totalIncome),
   })
 }
