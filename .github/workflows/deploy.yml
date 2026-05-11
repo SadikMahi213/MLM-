@@ -1,0 +1,105 @@
+name: Deploy MLM Platform
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: mlm_test
+          POSTGRES_USER: mlm_user
+          POSTGRES_PASSWORD: mlm_test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          extensions: pdo_pgsql
+
+      - name: Install Dependencies
+        working-directory: ./backend
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Generate Key
+        working-directory: ./backend
+        run: php artisan key:generate
+
+      - name: Run Migrations
+        working-directory: ./backend
+        run: php artisan migrate --force
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_DATABASE: mlm_test
+          DB_USERNAME: mlm_user
+          DB_PASSWORD: mlm_test_pass
+
+      - name: Run Tests
+        working-directory: ./backend
+        run: php artisan test
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_DATABASE: mlm_test
+          DB_USERNAME: mlm_user
+          DB_PASSWORD: mlm_test_pass
+          REDIS_HOST: localhost
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Build
+        working-directory: ./frontend
+        run: npm run build
+
+  deploy:
+    needs: [backend-tests, frontend-tests]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Coolify
+        run: |
+          curl -X POST "${{ secrets.COOLIFY_WEBHOOK_URL }}"

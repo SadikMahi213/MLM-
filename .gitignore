@@ -1,0 +1,51 @@
+# Dependencies
+backend/vendor/
+frontend/node_modules/
+frontend/.next/
+
+# Environment files
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env.local
+frontend/.env.*.local
+
+# Build outputs
+backend/public/build/
+backend/public/hot
+frontend/out/
+frontend/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+backend/storage/logs/*.log
+backend/storage/framework/cache/data/*
+backend/storage/framework/views/*.php
+!backend/storage/framework/views/.gitignore
+
+# Cache
+backend/bootstrap/cache/*.php
+!backend/bootstrap/cache/.gitignore
+
+# Laravel specific
+backend/storage/app/public/*
+!backend/storage/app/public/.gitignore
+
+# Ngrok
+ngrok.yml
+ngrok.log
+
+# PHP
+*.cache
